@@ -49,3 +49,6 @@ Francisco Anzola - Gangnam, CC BY 2.0, https://commons.wikimedia.org/w/index.php
 Gzzz - CC BY-SA 3.0, https://commons.wikimedia.org/w/index.php?curid=15920264
 Weatherman1126, Public Domain, https://commons.wikimedia.org/w/index.php?curid=2993854
 Beau Wade, CC BY 2.0, https://commons.wikimedia.org/w/index.php?curid=3432086
+
+---
+Copyright 2019 Tom Stoll (Kitefish Labs), distributed under the terms of the GNU General Public License, version 3.
