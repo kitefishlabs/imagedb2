@@ -58,7 +58,7 @@ __copyright__ = "Copyright (C) 2019 Thomas Stoll, All Rights Reserved"
 __license__ = "gpl 3.0 or higher"
 __email__ = 'tom@kitefishlabs.com'
 
-import sys, time, os, json
+import sys, os
 import cv2 as cv
 import numpy as np
 
