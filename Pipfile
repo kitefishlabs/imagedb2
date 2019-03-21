@@ -4,11 +4,12 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+pylint = "*"
 
 [packages]
 numpy = "*"
 ipython = "*"
-opencv = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.6"
