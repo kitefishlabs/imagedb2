@@ -61,7 +61,7 @@ class ColorFeaturesPyramid:
         """
         ap = self.analysis_params
         imgpath = ap['media_file_path']
-        print('Down-sample + analyze: ' + imgpath)
+        print('Down-sample + analyze: ' + imgpath + ' (' + str(ap['down_sampling']) + ')')
         datapath = ap['media_file_path'] + '.pyr'
 
         img = cv.imread(imgpath)
@@ -88,7 +88,7 @@ class ColorFeaturesPyramid:
         
         return (imgh, imgw)
     
-    def load_and_display(self, ds=2):
+    def load_and_display(self, ds=8):
         ap = self.analysis_params
         imgpath = ap['media_file_path']
         lvl = int(math.log2(ds))
@@ -98,4 +98,13 @@ class ColorFeaturesPyramid:
         fp = np.memmap(datapath, dtype='uint8', mode='r+', shape=(int(img.shape[0] / math.pow(2, lvl)), int(img.shape[1] / math.pow(2, lvl)), 3))
         plt.imshow(fp)
         plt.show()
+        return (fp, img.shape, fp.shape)
+    
+    def get_downsampled_data(self, lvl=8):
+        ap = self.analysis_params
+        imgpath = ap['media_file_path']
+        datapath = ap['media_file_path'] + '.pyr' + str(lvl)
+        print('Read down-sampled: ' + datapath)
+        img = cv.imread(imgpath)
+        fp = np.memmap(datapath, dtype='uint8', mode='r+', shape=(int(img.shape[0] / math.pow(2, lvl)), int(img.shape[1] / math.pow(2, lvl)), 3))
         return (fp, img.shape, fp.shape)
