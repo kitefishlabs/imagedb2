@@ -62,17 +62,23 @@ class ColorFeaturesPyramid:
         ap = self.analysis_params
         imgpath = ap['media_file_path']
         print('Down-sample + analyze: ' + imgpath + ' (' + str(ap['down_sampling']) + ')')
-        datapath = ap['media_file_path'] + '.pyr'
+        datapath = ap['media_file_path'] + '.' + ap['color_space'] + '.pyr'
 
         img = cv.imread(imgpath)
         imgw = img.shape[1]
         imgh = img.shape[0]
         ds_levels = int(math.log2(ap['down_sampling']))
 
-        imgs_ds = [img] + [np.zeros((int(imgh / math.pow(2, (level+1))), int(imgw / math.pow(2, (level+1))), 3), dtype=np.uint8) for level in range(ds_levels)]
+        # convert color space once
+        if ap['color_space'] == 'rgb':
+            print('2 rgb')
+            img_ = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        else:
+            print('2 lab')
+            img_ = cv.cvtColor(img, cv.COLOR_BGR2Lab)
 
-        print(ds_levels)
-        print(len(imgs_ds))
+        # create a list of np arrays to hold our gradually shrinking arrays
+        imgs_ds = [img_] + [np.zeros((int(imgh / math.pow(2, (level+1))), int(imgw / math.pow(2, (level+1))), 3), dtype=np.uint8) for level in range(ds_levels)]
 
         for level in range(ds_levels):
             print('level: ', str(level))
@@ -92,7 +98,7 @@ class ColorFeaturesPyramid:
         ap = self.analysis_params
         imgpath = ap['media_file_path']
         lvl = int(math.log2(ds))
-        datapath = ap['media_file_path'] + '.pyr' + str(lvl)
+        datapath = ap['media_file_path'] + '.' + ap['color_space'] + '.pyr' + str(lvl)
         print('Display down-sampled: ' + datapath)
         img = cv.imread(imgpath)
         fp = np.memmap(datapath, dtype='uint8', mode='r+', shape=(int(img.shape[0] / math.pow(2, lvl)), int(img.shape[1] / math.pow(2, lvl)), 3))
@@ -103,7 +109,7 @@ class ColorFeaturesPyramid:
     def get_downsampled_data(self, lvl=8):
         ap = self.analysis_params
         imgpath = ap['media_file_path']
-        datapath = ap['media_file_path'] + '.pyr' + str(lvl)
+        datapath = ap['media_file_path'] + '.' + ap['color_space'] + '.pyr' + str(lvl)
         print('Read down-sampled: ' + datapath)
         img = cv.imread(imgpath)
         fp = np.memmap(datapath, dtype='uint8', mode='r+', shape=(int(img.shape[0] / math.pow(2, lvl)), int(img.shape[1] / math.pow(2, lvl)), 3))
