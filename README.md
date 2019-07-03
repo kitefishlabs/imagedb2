@@ -2,9 +2,15 @@
 
 Image indexing, DB, and recombination
 
-## Dependencies/Setup
+## Mac OS
 
-Linux Mint 19...
+Follow this guide from pyimagesearch. (I used Python 3.7, so far OK.)
+
+[Installing OpenCV4](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/)
+
+## Linux Mint 19...
+
+### Dependencies/Setup
 
 `apt-get install python3 python3-pip virtualenv`
 
