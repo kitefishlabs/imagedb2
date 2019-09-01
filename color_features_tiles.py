@@ -1,27 +1,29 @@
-# color_features_pyramid.py - color features pyramid data from images
+# color_features_tiles.py - color features tiled data from images
 # ImageDB2 - Tools for analysis, indexing, search, and creative use of image data
 
 """
-ColorFeaturesPyramid
+ColorFeaturesTiles
 Part of ImageDB2 - Tools for analysis, indexing, search, and creative use of image data
 
 Overview
 ========
 Pyramid down-sampling + color-feature analysis.
-Saves downsampled data to NAME.COLORSPACE.PYR{DOWNSAMPLING} data files mem-mapped to np arrays.
-Also retrieves and displays down-sampled image data.
+Saves downsampled data to NAME.COLORSPACE.TILE{SIZE}.OLAP{SIZE} data files mem-mapped to np arrays.
+Also retrieves and displays tiled image data.
 
 """
 
 import sys
 import os
+import os.path as path
+import re
 import math
 import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-class ColorFeaturesPyramid:
+class ColorFeaturesTiles:
     """
     """
 
@@ -64,39 +66,93 @@ class ColorFeaturesPyramid:
         }
         return analysis_params
 
-    def _down_sample_and_analyze(self):
+    def _sample_and_analyze(self):
         """
-        Reads and image, performs a series of down-samplings, writes each to disk
+        Reads and image, performs a series of samplings, feature extraction, writes each to disk
         """
         ap = self.analysis_params
         imgpath = ap['media_file_path']
-        print('Down-sample + analyze: ' + imgpath +
+        print('Sample + analyze: ' + imgpath +
               ' (' + str(ap['down_sampling']) + ')')
-        datapath = ap['media_file_path'] + '.' + ap['color_space'] + '.pyr'
+        # datapath = ap['media_file_path'] + '.' + ap['color_space'] + '.pyr'
+
+        m = re.search(r'(\d+).jpg', path.basename(imgpath))
+        idnum = m.group(1)
 
         img = cv.imread(imgpath)
         imgw = img.shape[1]
         imgh = img.shape[0]
-        ds_levels = int(math.log2(ap['down_sampling']))
+        tilesize = ap['tile-size']
+        # tileolap = ap['tile-overlap']
 
         # convert color space once
         if ap['color_space'] == 'rgb':
-            img_ = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+            img = cv.cvtColor(img, cv.COLOR_RGB2RGB)
         else:
-            img_ = cv.cvtColor(img, cv.COLOR_BGR2Lab)
+            img = cv.cvtColor(img, cv.COLOR_RGB2Lab)
 
-        # create a list of np arrays to hold our gradually shrinking arrays
-        imgs_ds = [img_] + [np.zeros((int(imgh / math.pow(2, (level+1))), int(
-            imgw / math.pow(2, (level+1))), 3), dtype=np.uint8) for level in range(ds_levels)]
+        aspect = imgw / imgh
+        tilew = int(img.shape[0] / tilesize)
+        tileh = int(img.shape[1] / tilesize)
 
-        for level in range(ds_levels):
-            imgs_ds[level+1] = cv.pyrDown(imgs_ds[level], imgs_ds[level+1])
+        # print("Tile sizes:")
+        # print(tilew)
+        # print(tileh)
+        # print(aspect)
 
-        for level in range(ds_levels):
-            fp = np.memmap((datapath + str(level+1)), dtype='uint8', mode='w+',
-                           shape=(imgs_ds[level+1].shape[0], imgs_ds[level+1].shape[1], 3))
-            fp[:] = np.copy(imgs_ds[level+1])
-            fp.flush()
+        mask = np.zeros(img.shape[:2], np.uint8)
+
+        all_histograms = np.array([], dtype=np.float32)
+        all_histograms.shape = (0, 1)
+
+        for y in range(tilesize):
+            for x in range(tilesize):
+
+                # print("tilesize, x, y:")
+                # print(tilesize)
+                # print(y)
+                # print(x)
+                # print("coords:")
+                # print((tileh * y))
+                # print((tileh * (y + 1)))
+                # print((tilew * x))
+                # print((tilew * (x + 1)))
+
+                mask[(tilew * x):(tilew * (x + 1)),
+                     (tileh * y):(tileh * (y + 1))] = 255
+                masked_img = cv.bitwise_and(img, img, mask=mask)
+
+                hist_masked = cv.calcHist([img], [0], mask, [32], [0, 256])
+                hist_masked = cv.normalize(hist_masked, hist_masked)
+                hist_masked.shape = (32, 1)
+
+                id_info = np.array(
+                    [idnum, x, y, tilew, tileh], dtype='float32')
+                id_info.shape = (5, 1)
+
+                # print(hist_masked.shape)
+                # print(id_info.shape)
+
+                # print(hist_masked.dtype)
+                # print(id_info.dtype)
+
+                row = np.r_[hist_masked, id_info]
+                # print(row.shape)
+                all_histograms = np.r_[all_histograms, row]
+
+                # plt.subplot(221), plt.imshow(img, 'gray')
+                # plt.subplot(222), plt.imshow(mask, 'gray')
+                # plt.subplot(223), plt.imshow(masked_img, 'gray')
+                # plt.subplot(224), plt.plot(hist_full), plt.plot(hist_masked)
+                # plt.xlim([0, 32])
+                # plt.show()
+
+        # print("::")
+        # print(all_histograms.shape)
+        all_histograms.shape = (37, int(all_histograms.shape[0] / 37))
+        # print(all_histograms.shape)
+
+        return all_histograms
 
     def load_and_display(self, ds=8):
         """
