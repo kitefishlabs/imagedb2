@@ -1,13 +1,6 @@
 from color_features_pyramid import *
 import numpy as np
-
-
-def div2(x):
-    return int(x/2)
-
-
-def dfloor(x, d):
-    return int(x - (x % d))
+from utils import *
 
 
 class ColorFeaturesHash:

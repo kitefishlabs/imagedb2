@@ -4,5 +4,7 @@
 *.lab
 *.rgb
 *.pyr*
+*.histo
 
 __pycache__*
+
