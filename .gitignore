@@ -5,6 +5,8 @@
 *.rgb
 *.pyr*
 *.histo
+*.nn
 
 __pycache__*
 
+out/*

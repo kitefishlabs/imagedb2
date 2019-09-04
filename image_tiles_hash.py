@@ -104,42 +104,89 @@ class ImageTilesHash:
             # total += abs(a - b)
         return total / len(hista)
 
-    def index_internal_connections(self):
+    # def index_internal_connections(self):
+    #     """
+    #     Internal similarities are expected to be prevalent in general, and should also correlate to positional proximity. Starting with option C.
+    #     A/ Rank similar but distant tiles higher. (more likely to spawn images with internal consistency/repetition?)
+    #     B/ Rank similar and proximate tiles higher (less churn, repetition?)
+    #     C/ Ignore distance
+    #     """
+    #     for filepath in glob.glob(self.analysis_params['media_directory'] + '/*.jpg.histo'):
+    #         index = pickle.loads(open(filepath, "rb").read())
+    #         rankings = []
+    #         for (i, cell) in enumerate(index):
+    #             scores = []
+    #             val = (self.convert_8(cell[0]), self.convert_8(
+    #                 cell[1]), self.convert_8(cell[2]))
+    #             for (j, cell2) in enumerate(index):
+    #                 if j > i:
+    #                     val2 = (self.convert_8(cell2[0]), self.convert_8(
+    #                         cell2[1]), self.convert_8(cell2[2]))
+    #                     # print((i, j, self.convert_8(cell[0]), self.convert_8(
+    #                     # cell[1]), self.convert_8(cell[2]), self.convert_8(cell2[0]), self.convert_8(
+    #                     # cell2[1]), self.convert_8(cell2[2])))
+    #                     diff0 = self.diff_histograms(val[0], val2[0])
+    #                     diff1 = self.diff_histograms(val[1], val2[1])
+    #                     diff2 = self.diff_histograms(val[2], val2[2])
+    #                     scores += [[i, j, (diff0 + diff1 + diff2)]]
+    #             # each cell is the distances to all 256 other cells (including itself)
+    #             # now sort the cell's connections
+    #             print(scores)
+    #             sorted_by_dist = sorted(
+    #                 scores, key=(lambda score: score[2]))[:20]
+    #             rankings += sorted_by_dist
+    #         f = open(filepath + ".internal", "wb")
+    #         f.write(pickle.dumps(rankings))
+    #         f.close()
+
+    def index_connections(self):
         """
         Internal similarities are expected to be prevalent in general, and should also correlate to positional proximity. Starting with option C.
         A/ Rank similar but distant tiles higher. (more likely to spawn images with internal consistency/repetition?)
         B/ Rank similar and proximate tiles higher (less churn, repetition?)
         C/ Ignore distance
         """
-        for filepath in glob.glob(self.analysis_params['media_directory'] + '/*.jpg.histo'):
-            # idnum = -1
-            # m = re.search(r'(\d+).[jpg|png]', path.basename(filepath))
-            # if m is not None:
-            #     idnum = m.group(1)
-            index = pickle.loads(open(filepath, "rb").read())
+        all_files = glob.glob(
+            self.analysis_params['media_directory'] + '/*.jpg.histo')
+        all_files_ = glob.glob(
+            self.analysis_params['media_directory'] + '/*.jpg.histo')
+
+        for a, filepatha in enumerate(all_files):
+
+            indexa = pickle.loads(open(filepatha, "rb").read())
             rankings = []
-            for (i, cell) in enumerate(index):
-                scores = []
-                val = (self.convert_8(cell[0]), self.convert_8(
-                    cell[1]), self.convert_8(cell[2]))
-                for (j, cell2) in enumerate(index):
-                    if ((j >= i) and (i != j)):
-                        val2 = (self.convert_8(cell2[0]), self.convert_8(
-                            cell2[1]), self.convert_8(cell2[2]))
-                        # print((i, j, self.convert_8(cell[0]), self.convert_8(
-                        # cell[1]), self.convert_8(cell[2]), self.convert_8(cell2[0]), self.convert_8(
-                        # cell2[1]), self.convert_8(cell2[2])))
-                        diff0 = self.diff_histograms(val[0], val2[0])
-                        diff1 = self.diff_histograms(val[1], val2[1])
-                        diff2 = self.diff_histograms(val[2], val2[2])
-                        scores += [(i, j, (diff0 + diff1 + diff2))]
-                # each cell is the distances to all 256 other cells (including itself)
-                # now sort the cell's connections
-                print(scores)
-                sorted_by_dist = sorted(
-                    scores, key=(lambda score: score[2]))[:20]
-                rankings += sorted_by_dist
-            # f = open(filepath + ".internal", "wb")
-            # f.write(pickle.dumps(res))
-            # f.close()
-            return rankings
+
+            for b, filepathb in enumerate(all_files_):
+
+                if b >= a:
+
+                    indexb = pickle.loads(open(filepathb, "rb").read())
+
+                    for (i, cell) in enumerate(indexa):
+
+                        scores = []
+                        val = (self.convert_8(cell[0]), self.convert_8(
+                            cell[1]), self.convert_8(cell[2]))
+
+                        for (j, cell2) in enumerate(indexb):
+                            if j > i:
+                                val2 = (self.convert_8(cell2[0]), self.convert_8(
+                                    cell2[1]), self.convert_8(cell2[2]))
+                                # print((i, j, self.convert_8(cell[0]), self.convert_8(
+                                # cell[1]), self.convert_8(cell[2]), self.convert_8(cell2[0]), self.convert_8(
+                                # cell2[1]), self.convert_8(cell2[2])))
+                                diff0 = self.diff_histograms(val[0], val2[0])
+                                diff1 = self.diff_histograms(val[1], val2[1])
+                                diff2 = self.diff_histograms(val[2], val2[2])
+                                scores += [[a, b, i, j,
+                                            (diff0 + diff1 + diff2)]]
+                        # each cell is the distances to all 256 other cells (including itself)
+                        # now sort the cell's connections
+                        # print(scores)
+                        sorted_by_dist = sorted(
+                            scores, key=(lambda score: score[2]))[:20]
+                        rankings += sorted_by_dist
+
+            f = open(filepatha + ".nn", "wb")
+            f.write(pickle.dumps(rankings))
+            f.close()
