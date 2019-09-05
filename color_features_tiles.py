@@ -87,6 +87,9 @@ class ColorFeaturesTiles:
         tilesize = ap['tile_divs']
         # tileolap = ap['tile-overlap']
 
+        tilesh = int(math.floor(imgh / 36))
+        tilesw = int(math.floor(imgh / 72))
+
         # convert color space once
         if ap['color_space'] == 'rgb':
             img = cv.cvtColor(img, cv.COLOR_RGB2RGB)
@@ -94,8 +97,8 @@ class ColorFeaturesTiles:
             img = cv.cvtColor(img, cv.COLOR_RGB2Lab)
 
         aspect = imgw / imgh
-        tilew = int(img.shape[0] / tilesize)
-        tileh = int(img.shape[1] / tilesize)
+        tilew = 72  # int(img.shape[0] / tilesize)
+        tileh = 36  # int(img.shape[1] / tilesize)
 
         print("Tile sizes:")
         print(tilew)
@@ -107,8 +110,8 @@ class ColorFeaturesTiles:
         all_histograms = np.array([], dtype=np.float32)
         all_histograms.shape = (0, 1)
 
-        for y in range(tilesize):
-            for x in range(tilesize):
+        for y in range(tilesh):
+            for x in range(tilesw):
 
                 # print("tilesize, x, y:")
                 # print(tilesize)

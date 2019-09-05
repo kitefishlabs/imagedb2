@@ -139,6 +139,13 @@ class ImageTilesHash:
     #         f.write(pickle.dumps(rankings))
     #         f.close()
 
+    def extract_file_id(self, fpath):
+        idnum = -1
+        m = re.search(r'(\d+).jpg', path.basename(fpath))
+        if m is not None:
+            idnum = m.group(1)
+        return int(idnum)
+
     def index_connections(self):
         """
         Internal similarities are expected to be prevalent in general, and should also correlate to positional proximity. Starting with option C.
@@ -151,41 +158,42 @@ class ImageTilesHash:
         all_files_ = glob.glob(
             self.analysis_params['media_directory'] + '/*.jpg.histo')
 
-        for a, filepatha in enumerate(all_files):
+        for filepatha in all_files:
 
+            a = self.extract_file_id(filepatha)
             indexa = pickle.loads(open(filepatha, "rb").read())
-            rankings = []
+            rankings = {}
 
-            for b, filepathb in enumerate(all_files_):
+            for filepathb in all_files_:
 
-                if b >= a:
+                # if b >= a:
+                b = self.extract_file_id(filepathb)
+                indexb = pickle.loads(open(filepathb, "rb").read())
 
-                    indexb = pickle.loads(open(filepathb, "rb").read())
+                for cell in indexa:
 
-                    for (i, cell) in enumerate(indexa):
+                    scores = []
+                    val = (self.convert_8(cell[0]), self.convert_8(
+                        cell[1]), self.convert_8(cell[2]))
 
-                        scores = []
-                        val = (self.convert_8(cell[0]), self.convert_8(
-                            cell[1]), self.convert_8(cell[2]))
+                    for cell2 in indexb:
 
-                        for (j, cell2) in enumerate(indexb):
-                            if j > i:
-                                val2 = (self.convert_8(cell2[0]), self.convert_8(
-                                    cell2[1]), self.convert_8(cell2[2]))
-                                # print((i, j, self.convert_8(cell[0]), self.convert_8(
-                                # cell[1]), self.convert_8(cell[2]), self.convert_8(cell2[0]), self.convert_8(
-                                # cell2[1]), self.convert_8(cell2[2])))
-                                diff0 = self.diff_histograms(val[0], val2[0])
-                                diff1 = self.diff_histograms(val[1], val2[1])
-                                diff2 = self.diff_histograms(val[2], val2[2])
-                                scores += [[a, b, i, j,
-                                            (diff0 + diff1 + diff2)]]
-                        # each cell is the distances to all 256 other cells (including itself)
-                        # now sort the cell's connections
-                        # print(scores)
-                        sorted_by_dist = sorted(
-                            scores, key=(lambda score: score[2]))[:20]
-                        rankings += sorted_by_dist
+                        val2 = (self.convert_8(cell2[0]), self.convert_8(
+                            cell2[1]), self.convert_8(cell2[2]))
+                        # print((i, j, self.convert_8(cell[0]), self.convert_8(
+                        # cell[1]), self.convert_8(cell[2]), self.convert_8(cell2[0]), self.convert_8(
+                        # cell2[1]), self.convert_8(cell2[2])))
+                        diff0 = self.diff_histograms(val[0], val2[0])
+                        diff1 = self.diff_histograms(val[1], val2[1])
+                        diff2 = self.diff_histograms(val[2], val2[2])
+                        scores += [[a, b, cell[4], cell[5], cell2[4], cell2[5],
+                                    (diff0 + diff1 + diff2)]]
+                    # each cell is the distances to all 256 other cells (including itself)
+                    # now sort the cell's connections
+                    # print(scores)
+                    sorted_by_dist = sorted(
+                        scores, key=(lambda score: score[-1]))[:20]
+                    rankings[(cell[4], cell[5])] = sorted_by_dist
 
             f = open(filepatha + ".nn", "wb")
             f.write(pickle.dumps(rankings))

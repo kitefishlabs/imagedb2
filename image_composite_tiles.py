@@ -15,6 +15,7 @@ import sys
 import os
 import os.path as path
 import random
+import math
 import pickle
 import cv2 as cv
 import numpy as np
@@ -31,6 +32,7 @@ class ImageCompositeTiles:
         self.overlay_image = None
         self.manip_array = None
         self.th = self.tw = self.tth = self.ttw = 0
+        self.numh = self.numw = 0
         self.generations = 0
         self.runid = 0
 
@@ -113,14 +115,24 @@ class ImageCompositeTiles:
             path = p['image_input_dir'] + '/00' + str(tid) + '.jpg'
         self.target_image = cv.imread(path)
         target_histo = pickle.loads(open((path + ".histo"), "rb").read())
-        self.ttw = int(target_histo[0][7])
-        self.tth = int(target_histo[0][6])
-        self.tw = self.ttw * 16
-        self.th = self.tth * 16
+        # print((target_histo, target_histo[-1]))
+
+        self.ttw = int(target_histo[-1][6])
+        self.tth = int(target_histo[-1][7])
+        assert(self.ttw == 72)
+        assert(self.tth == 36)
+        imgw = self.target_image.shape[1]
+        imgh = self.target_image.shape[0]
+        self.numw = int(math.floor(imgw / self.ttw))
+        self.numh = int(math.floor(imgh / self.tth))
+        self.tw = self.numw * 72
+        self.th = self.numh * 36
+        assert(self.tw <= imgw)
+        assert(self.th <= imgh)
 
     def init_modifications(self):
-        self.manip_array = [[None for r in range(self.params['tile_divs'])]
-                            for c in range(self.params['tile_divs'])]
+        self.manip_array = [[None for r in range(self.numh)]
+                            for c in range(self.numw)]
 
     def init_overlay(self, tid):
         p = self.params
@@ -136,39 +148,47 @@ class ImageCompositeTiles:
             self.overlay_image = np.ones((self.th, self.tw, 3)) * 255.0
 
     def write_overlay_image(self, outpath):
-        assert(self.overlay_image is not None)
-        cv.imwrite(outpath, self.overlay_image)
+        # print(self.overlay_image)
+        if self.overlay_image is not None:
+            cv.imwrite(outpath, self.overlay_image)
 
     def modify_rule1(self, gen):
         # ROW COL CHAN
-        rando_target_loc = (random.randint(0, 15), random.randint(0, 15))
-        rando_sampled_loc = (random.randint(0, 15), random.randint(0, 15))
+        rando_target_loc = (random.randint(0, self.numh - 1),
+                            random.randint(0, self.numw - 1))
+        rando_sampled_loc = (random.randint(0, self.numh - 1),
+                             random.randint(0, self.numw - 1))
         rando_sampled_id = 3  # random.randint(0, 9)
         # update modifications array
-        self.manip_array[rando_target_loc[0]][rando_target_loc[1]] = (gen,
-                                                                      2, rando_sampled_id,
-                                                                      rando_sampled_loc[0], rando_sampled_loc[1])
-        print([[data for data in row if data is not None]
-               for row in self.manip_array])
+        try:
+            self.manip_array[rando_target_loc[0]][rando_target_loc[1]] = (gen,
+                                                                          2, rando_sampled_id,
+                                                                          rando_sampled_loc[0],
+                                                                          rando_sampled_loc[1])
+        except IndexError:
+            print("skipping this generation's modification due to IndexError")
+            return
+
+        # print([[data for data in row if data is not None]
+            #    for row in self.manip_array])
 
         # load overlay histo file to grab dimmensions
         simg_histo_path = self.params['image_input_dir'] + \
             '/' + self.padint(rando_sampled_id, 3) + '.jpg.histo'
         simg_histo = pickle.loads(open(simg_histo_path, 'rb').read())
         sy, sx = rando_sampled_loc[0], rando_sampled_loc[1]
-        sth, stw = simg_histo[0][6], simg_histo[0][7]
+        stw, sth = simg_histo[0][6], simg_histo[0][7]
         ty, tx = rando_target_loc
 
-        # print(oimg_histo)
-        print(rando_target_loc)
-        print(sy)
-        print(sx)
-        print(self.tth)
-        print(self.ttw)
-        print(sth)
-        print(stw)
-        print(ty)
-        print(tx)
+        # print(rando_target_loc)
+        # print(sy)
+        # print(sx)
+        # print(self.tth)
+        # print(self.ttw)
+        # print(sth)
+        # print(stw)
+        # print(ty)
+        # print(tx)
 
         # # load overlay image and extract the tile subimage
         simg_path = self.params['image_input_dir'] + \
@@ -181,36 +201,140 @@ class ImageCompositeTiles:
         ow1 = int(tx * self.ttw)
         ow2 = int(ow1 + self.ttw)
 
-        print("-------")
-        print(oh1)
-        print(oh2)
-        print(ow1)
-        print(ow2)
+        # print("-------")
+        # print(oh1)
+        # print(oh2)
+        # print(ow1)
+        # print(ow2)
 
         oimg_path = self.params['image_output_dir'] + '/' + \
             self.padint(gen, 5) + '.jpg'
-        print(oimg_path)
+        # print(oimg_path)
 
         sh1 = int(sth * sy)
         sh2 = int(sh1 + min(self.tth, sth))
         sw1 = int(stw * sx)
         sw2 = int(sw1 + min(self.ttw, stw))
 
-        print("=========")
-        print(sh1)
-        print(sh2)
-        print(sw1)
-        print(sw2)
+        # print("=========")
+        # print(sh1)
+        # print(sh2)
+        # print(sw1)
+        # print(sw2)
         oh2 = int(oh1 + min(self.tth, sth))
         ow2 = int(ow1 + min(self.ttw, stw))
-        print("<<<<<>>>>>")
-        print(oh2)
-        print(ow2)
-        self.overlay_image[oh1:oh2, ow1:ow2, :] = simg[sh1:sh2, sw1:sw2, :]
-        self.write_overlay_image(oimg_path)
+        # print("<<<<<>>>>>")
+        # print(oh2)
+        # print(ow2)
+        try:
+            self.overlay_image[oh1:oh2, ow1:ow2, :] = simg[sh1:sh2, sw1:sw2, :]
+            self.write_overlay_image(oimg_path)
+        except ValueError:
+            print("skipping this generation's image overlay write due to ValueError")
 
-    def modify_rule2(self):
-        pass
+    def modify_rule2(self, gen):
+        p = self.params
+        timg_path = p['image_input_dir'] + '/' + \
+            str(self.padint(p['target_id'], 3)) + '.jpg'
+
+        timg_nn = pickle.loads(
+            open(timg_path + '.histo.nn', 'rb').read())
+
+        tkeys = list(timg_nn.keys())
+        num_keys = len(tkeys)
+        choice = random.randint(0, (num_keys - 1))
+        rando_target_loc = tkeys[choice]
+
+        print(num_keys)
+        # print(choice)
+        print(rando_target_loc)
+        print(timg_nn[rando_target_loc])
+
+        timg_nn_cell = timg_nn[rando_target_loc]
+
+        cell_len = len(timg_nn_cell)
+        chosen = timg_nn_cell[random.randint(0, (cell_len - 1))]
+        rando_sampled_loc = (int(chosen[4]), int(chosen[5]))
+        rando_sampled_id = chosen[1]
+
+        print(">>>\n")
+        # print(cell_len)
+        # print(chosen)
+        # print(rando_sampled_loc)
+        # print(rando_sampled_id)
+
+        # update modifications array
+        try:
+            self.manip_array[int(rando_target_loc[0])][int(rando_target_loc[1])] = (gen,
+                                                                                    2, rando_sampled_id,
+                                                                                    rando_sampled_loc[0],
+                                                                                    rando_sampled_loc[1])
+        except IndexError:
+            print("skipping this generation's modification due to IndexError")
+            return
+
+        # print([[data for data in row if data is not None]
+            #    for row in self.manip_array])
+
+        # load overlay histo file to grab dimmensions
+        simg_histo_path = self.params['image_input_dir'] + \
+            '/' + self.padint(rando_sampled_id, 3) + '.jpg.histo'
+        simg_histo = pickle.loads(open(simg_histo_path, 'rb').read())
+        sy, sx = rando_sampled_loc[0], rando_sampled_loc[1]
+        stw, sth = simg_histo[0][6], simg_histo[0][7]
+        ty, tx = rando_target_loc
+
+        # print(rando_target_loc)
+        # print(sy)
+        # print(sx)
+        # print(self.tth)
+        # print(self.ttw)
+        # print(sth)
+        # print(stw)
+        # print(ty)
+        # print(tx)
+
+        # # load overlay image and extract the tile subimage
+        simg_path = self.params['image_input_dir'] + \
+            '/' + self.padint(rando_sampled_id, 3) + '.jpg'
+        simg = cv.imread(simg_path)
+
+        # until the resolutions match, this is going to clip (or underfill at far edges)
+        oh1 = int(ty * self.tth)
+        oh2 = int(oh1 + self.tth)
+        ow1 = int(tx * self.ttw)
+        ow2 = int(ow1 + self.ttw)
+
+        # print("-------")
+        # print(oh1)
+        # print(oh2)
+        # print(ow1)
+        # print(ow2)
+
+        oimg_path = self.params['image_output_dir'] + '/' + \
+            self.padint(gen, 5) + '.jpg'
+        # print(oimg_path)
+
+        sh1 = int(sth * sy)
+        sh2 = int(sh1 + min(self.tth, sth))
+        sw1 = int(stw * sx)
+        sw2 = int(sw1 + min(self.ttw, stw))
+
+        # print("=========")
+        # print(sh1)
+        # print(sh2)
+        # print(sw1)
+        # print(sw2)
+        oh2 = int(oh1 + min(self.tth, sth))
+        ow2 = int(ow1 + min(self.ttw, stw))
+        # print("<<<<<>>>>>")
+        # print(oh2)
+        # print(ow2)
+        try:
+            self.overlay_image[oh1:oh2, ow1:ow2, :] = simg[sh1:sh2, sw1:sw2, :]
+            self.write_overlay_image(oimg_path)
+        except ValueError:
+            print("skipping this generation's image overlay write due to ValueError")
 
     def modify_rule3(self):
         pass
@@ -230,17 +354,19 @@ class ImageCompositeTiles:
     # def get_target_path(self, path, idnum):
     #     return(path + '/img_' + padint(self.generation, 4) + '.jpg')
 
-    def update_for_n_generations(self, n=10):
+    def update_for_n_generations(self, gens=10):
         p = self.params
-        for gen in range(n):
-            # op = 0
-            op = self.choose_op()
+        for gen in range(gens):
+            op = 2
+            # op = self.choose_op()
             if op == 1:
                 self.modify_rule1((self.generations + gen))
+            elif op == 2:
+                self.modify_rule2((self.generations + gen))
             else:
                 pass
             output_path = p['image_output_dir'] + \
                 '/' + self.padint((self.generations + gen), 5) + '.jpg'
             cv.imwrite(output_path, self.overlay_image)
-        self.generations += n
+        self.generations += gens
         print("Done! Use ffmpeg to create your animation...")
