@@ -74,7 +74,6 @@ class ColorFeaturesTiles:
         imgpath = ap['media_file_path']
         print('Sample + analyze: ' + imgpath +
               ' (' + str(ap['tile_divs']) + ')')
-        # datapath = ap['media_file_path'] + '.' + ap['color_space'] + '.pyr'
 
         idnum = -1
         m = re.search(r'(\d+).[jpg|png]', path.basename(imgpath))
@@ -84,11 +83,11 @@ class ColorFeaturesTiles:
         img = cv.imread(imgpath)
         imgw = img.shape[1]
         imgh = img.shape[0]
-        tilesize = ap['tile_divs']
+        # tilesize = ap['tile_divs']
         # tileolap = ap['tile-overlap']
 
         tilesh = int(math.floor(imgh / 36))
-        tilesw = int(math.floor(imgh / 72))
+        tilesw = int(math.floor(imgw / 72))
 
         # convert color space once
         if ap['color_space'] == 'rgb':
@@ -125,7 +124,7 @@ class ColorFeaturesTiles:
 
                 mask[(tilew * x):(tilew * (x + 1)),
                      (tileh * y):(tileh * (y + 1))] = 255
-                masked_img = cv.bitwise_and(img, img, mask=mask)
+                # masked_img = cv.bitwise_and(img, img, mask=mask)
 
                 hist_masked = cv.calcHist([img], [channel], mask, [
                                           16], [0, 256])

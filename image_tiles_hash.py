@@ -11,34 +11,34 @@ class ImageTilesHash:
     The aim is to create a hash table mapping color histogram data to tiles in the image.
     """
 
-    def __init__(self, **analysis_params):
-        self.initialize(analysis_params)
+    def __init__(self, **params):
+        self.initialize(params)
 
-    def initialize(self, analysis_params=None):
-        self._check_cf_params(analysis_params)
+    def initialize(self, params=None):
+        self._check_cf_params(params)
         self.image_tile_index = {}
 
-    def _check_cf_params(self, analysis_params=None):
+    def _check_cf_params(self, params=None):
         """
         Simple mechanism to read in default parameters while substituting custom parameters.
         """
-        self.analysis_params = analysis_params if analysis_params is not None else self.analysis_params
+        self.params = params if params is not None else self.params
         dcfp = self.default_cf_params()
         for k in dcfp.keys():
             if k == 'media_directory':
-                self.analysis_params[k] = os.path.abspath(
-                    self.analysis_params.get(k, dcfp[k]))
+                self.params[k] = os.path.abspath(
+                    self.params.get(k, dcfp[k]))
             else:
-                self.analysis_params[k] = self.analysis_params.get(k, dcfp[k])
-        return self.analysis_params
+                self.params[k] = self.params.get(k, dcfp[k])
+        return self.params
 
     @staticmethod
     def default_cf_params():
-        analysis_params = {
+        params = {
             # default dir
             'media_directory': os.path.abspath('img')
         }
-        return analysis_params
+        return params
 
     def build_index_for_image(self, path, exp=4):
 
@@ -85,7 +85,7 @@ class ImageTilesHash:
         return trios
 
     def index_directory(self):
-        for filepath in glob.glob(self.analysis_params['media_directory'] + '/*.jpg'):
+        for filepath in glob.glob(self.params['media_directory'] + '/*.jpg'):
             res = self.build_index_for_image(filepath, 4)
             f = open(filepath + ".histo", "wb")
             f.write(pickle.dumps(res))
@@ -111,7 +111,7 @@ class ImageTilesHash:
     #     B/ Rank similar and proximate tiles higher (less churn, repetition?)
     #     C/ Ignore distance
     #     """
-    #     for filepath in glob.glob(self.analysis_params['media_directory'] + '/*.jpg.histo'):
+    #     for filepath in glob.glob(self.params['media_directory'] + '/*.jpg.histo'):
     #         index = pickle.loads(open(filepath, "rb").read())
     #         rankings = []
     #         for (i, cell) in enumerate(index):
@@ -154,9 +154,11 @@ class ImageTilesHash:
         C/ Ignore distance
         """
         all_files = glob.glob(
-            self.analysis_params['media_directory'] + '/*.jpg.histo')
+            self.params['media_directory'] + '/*.jpg.histo')
         all_files_ = glob.glob(
-            self.analysis_params['media_directory'] + '/*.jpg.histo')
+            self.params['media_directory'] + '/*.jpg.histo')
+
+        target_slots = {}
 
         for filepatha in all_files:
 
@@ -188,13 +190,118 @@ class ImageTilesHash:
                         diff2 = self.diff_histograms(val[2], val2[2])
                         scores += [[a, b, cell[4], cell[5], cell2[4], cell2[5],
                                     (diff0 + diff1 + diff2)]]
+                        try:
+                            existing = target_slots[(a, b)]
+                            target_slots[(a, b)] = (min(existing[0], cell2[4]),
+                                                    #   max(existing[0], a[4]),
+                                                    #   min(existing[1], x[4]),
+                                                    max(existing[1], cell2[4]),
+                                                    min(existing[2], cell2[5]),
+                                                    #   max(existing[2], a[5]),
+                                                    #   min(existing[3], a[5]),
+                                                    max(existing[3], cell2[5]))
+                        except KeyError:
+                            target_slots[(a, b)] = (
+                                cell2[4], cell2[4], cell2[5], cell2[5])
                     # each cell is the distances to all 256 other cells (including itself)
                     # now sort the cell's connections
                     # print(scores)
                     sorted_by_dist = sorted(
                         scores, key=(lambda score: score[-1]))[:20]
-                    rankings[(cell[4], cell[5])] = sorted_by_dist
+                    rankings[(b, cell[4], cell[5])] = sorted_by_dist
+            # print("TARG:")
+            # print(target_slots)
 
             f = open(filepatha + ".nn", "wb")
             f.write(pickle.dumps(rankings))
             f.close()
+        return target_slots
+
+    # In order to choose the files first and then within the files, we need to index each target file/point -> averaged distance combo so we can order by similarity over the entire set of points for each file. That way we shouldn't have "least bad choices" from minimizing the dist. func after a distant(dissimilar) file choice. A cursory glance at the data suggest that each individual file's points in similarity space may be clustered.
+
+    def index_files(self):
+        all_files = glob.glob(
+            self.params['media_directory'] + '/*.jpg.histo.nn')
+
+        general_dist_ranking = []
+        all_sorted_dists = {}
+        for filepatha in all_files:
+
+            a = self.extract_file_id(filepatha)
+            indexa = pickle.loads(open(filepatha, "rb").read())
+
+            for key in indexa:
+                # print(key) # to-id, from-c, from-r, to-c, to-r
+                total = 0.0
+                for item in indexa[key]:
+                    assert(len(item) == 7)
+                    total += item[-1]
+                assert(key[1] == item[-5])
+                assert(key[2] == item[-4])
+                # print(indexa[key])
+                # print((total, (key[0], key[1], key[2], item[-3], item[-2])))
+                general_dist_ranking += [(total, (key[0],
+                                                  key[1], key[2], item[-3], item[-2]))]
+
+            dist_ordered = sorted(general_dist_ranking, key=(lambda dm: dm[0]))
+
+            dist_ = [item[0] for item in dist_ordered]
+            payload_ = [item[1] for item in dist_ordered]
+            dist_ /= np.max(np.abs(dist_), axis=0)
+            dlen = len(dist_)
+            dist_ = [((1. - x) + ((((1. - (i / dlen)) * 10.) ** 2.) / 100.))
+                     for i, x in enumerate(dist_)]
+            combined = list(zip(dist_, payload_))
+
+            fileid = self.extract_file_id(filepatha)
+            all_sorted_dists[fileid] = (dist_, combined)
+
+            # print('------>>>>>>')
+            # print()
+            # print(combined)
+            # print()
+            # print()
+
+            f = open(filepatha + "2", "wb")
+            f.write(pickle.dumps(combined))
+            f.close()
+
+        return all_sorted_dists
+
+    def plumb_range(self, id):
+
+        limg_path = self.params['media_directory'] + \
+            '/' + padint(id, 3) + '.jpg'
+        limg = cv.imread(limg_path)
+        if limg is not None:
+            print(limg.shape)
+        limg_histo_path = self.params['media_directory'] + \
+            '/' + padint(id, 3) + '.jpg.histo'
+
+        try:
+            limg_histo = pickle.loads(open(limg_histo_path, 'rb').read())
+        except FileNotFoundError:
+            print("NotFound")
+            return
+
+        target_slots = {}
+        for x in limg_histo:
+            # print(x)
+            try:
+                existing = target_slots[x[3]]
+                target_slots[x[3]] = (min(existing[0], x[4]),
+                                      #   max(existing[0], a[4]),
+                                      #   min(existing[1], x[4]),
+                                      max(existing[1], x[4]),
+                                      min(existing[2], x[5]),
+                                      #   max(existing[2], a[5]),
+                                      #   min(existing[3], a[5]),
+                                      max(existing[3], x[5]))
+            except KeyError:
+                target_slots[x[3]] = (x[4], x[4], x[5], x[5])
+        return target_slots
+
+
+# idx = ith.index_files()
+# distrib = sorted(list(set([lst[0] for lst in idx])))
+# plt.plot(distrib)

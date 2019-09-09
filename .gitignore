@@ -6,7 +6,8 @@
 *.pyr*
 *.histo
 *.nn
+*.nn2
 
 __pycache__*
 
-out/*
+out*/*
