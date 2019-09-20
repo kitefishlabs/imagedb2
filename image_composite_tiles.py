@@ -474,7 +474,7 @@ class ImageCompositeTiles:
         try:
             limg_histo = pickle.loads(open(limg_histo_path, 'rb').read())
         except FileNotFoundError:
-            print("Skipping bad file! ---- probably 021?")
+            print("Skipping bad file!")
             print(limg_histo_path)
             return
 
@@ -590,3 +590,37 @@ class ImageCompositeTiles:
             cv.imwrite(output_path, self.overlay_image)
         self.generations += gens
         print("Done! Use ffmpeg to create your animation...")
+
+
+    def generate_neigbors_to_check(self, n=1):
+        p = self.params
+
+        rando_choice = random.randint(0, 27)
+        target_path = p['image_input_dir'] + '/' + padint(rando_choice, 3) + '.jpg'
+        self.target_image = cv.imread(target_path)
+        
+        rando_tile_r = random.randint(0,9)
+        rando_tile_c = random.randint(0,9)
+
+        # img_histo_path = target_path + '.histo'
+        
+        try:
+            timg_nn = pickle.loads(open(target_path + '.histo.nn', 'rb').read())
+        except FileNotFoundError:
+            print("Skipping bad nn file!")
+            print(img_histo_path)
+            return
+
+        print(timg_nn.keys())
+
+        choice = timg_nn[(rando_choice, float(rando_tile_r), float(rando_tile_c))]
+
+        print(choice)
+
+
+        # output_path = p['image_output_dir'] + '/' + padint(rando_choice, 5) + '.jpg'
+        # cv.imwrite(output_path, sim_mtrx)
+
+    # from image_composite_tiles import *
+    # ict = ImageCompositeTiles()
+    # ict.generate_neigbors_to_check()

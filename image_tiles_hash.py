@@ -104,41 +104,6 @@ class ImageTilesHash:
             # total += abs(a - b)
         return total / len(hista)
 
-    # def index_internal_connections(self):
-    #     """
-    #     Internal similarities are expected to be prevalent in general, and should also correlate to positional proximity. Starting with option C.
-    #     A/ Rank similar but distant tiles higher. (more likely to spawn images with internal consistency/repetition?)
-    #     B/ Rank similar and proximate tiles higher (less churn, repetition?)
-    #     C/ Ignore distance
-    #     """
-    #     for filepath in glob.glob(self.params['media_directory'] + '/*.jpg.histo'):
-    #         index = pickle.loads(open(filepath, "rb").read())
-    #         rankings = []
-    #         for (i, cell) in enumerate(index):
-    #             scores = []
-    #             val = (self.convert_8(cell[0]), self.convert_8(
-    #                 cell[1]), self.convert_8(cell[2]))
-    #             for (j, cell2) in enumerate(index):
-    #                 if j > i:
-    #                     val2 = (self.convert_8(cell2[0]), self.convert_8(
-    #                         cell2[1]), self.convert_8(cell2[2]))
-    #                     # print((i, j, self.convert_8(cell[0]), self.convert_8(
-    #                     # cell[1]), self.convert_8(cell[2]), self.convert_8(cell2[0]), self.convert_8(
-    #                     # cell2[1]), self.convert_8(cell2[2])))
-    #                     diff0 = self.diff_histograms(val[0], val2[0])
-    #                     diff1 = self.diff_histograms(val[1], val2[1])
-    #                     diff2 = self.diff_histograms(val[2], val2[2])
-    #                     scores += [[i, j, (diff0 + diff1 + diff2)]]
-    #             # each cell is the distances to all 256 other cells (including itself)
-    #             # now sort the cell's connections
-    #             print(scores)
-    #             sorted_by_dist = sorted(
-    #                 scores, key=(lambda score: score[2]))[:20]
-    #             rankings += sorted_by_dist
-    #         f = open(filepath + ".internal", "wb")
-    #         f.write(pickle.dumps(rankings))
-    #         f.close()
-
     def extract_file_id(self, fpath):
         idnum = -1
         m = re.search(r'(\d+).jpg', path.basename(fpath))
@@ -156,7 +121,7 @@ class ImageTilesHash:
         all_files = glob.glob(
             self.params['media_directory'] + '/*.jpg.histo')
         all_files_ = glob.glob(
-            self.params['media_directory'] + '/*.jpg.histo')
+            self.params['media_directory/hide'] + '/*.jpg.histo')
 
         target_slots = {}
 
@@ -217,18 +182,18 @@ class ImageTilesHash:
             f.close()
         return target_slots
 
-    # In order to choose the files first and then within the files, we need to index each target file/point -> averaged distance combo so we can order by similarity over the entire set of points for each file. That way we shouldn't have "least bad choices" from minimizing the dist. func after a distant(dissimilar) file choice. A cursory glance at the data suggest that each individual file's points in similarity space may be clustered.
+    # In order to choose the files first and then within the files, we need to index each target file/point -> averaged distance combo so we can order by similarity over the entire set of points for each file. That way we shouldn't have "least bad choices" from minimizing the dist. func after a distant(dissimilar) file choice. A cursory glance at the data suggest that each individual file's points in similarity space may be clustered when mapped onto larger search space.
 
     def index_files(self):
         all_files = glob.glob(
             self.params['media_directory'] + '/*.jpg.histo.nn')
 
-        general_dist_ranking = []
         all_sorted_dists = {}
         for filepatha in all_files:
 
             a = self.extract_file_id(filepatha)
             indexa = pickle.loads(open(filepatha, "rb").read())
+            general_dist_ranking = []
 
             for key in indexa:
                 # print(key) # to-id, from-c, from-r, to-c, to-r
@@ -286,7 +251,7 @@ class ImageTilesHash:
 
         target_slots = {}
         for x in limg_histo:
-            # print(x)
+            print(x)
             try:
                 existing = target_slots[x[3]]
                 target_slots[x[3]] = (min(existing[0], x[4]),
