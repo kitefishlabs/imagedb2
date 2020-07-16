@@ -22,6 +22,9 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 
+H = 24
+W = 36
+
 
 class ColorFeaturesTiles:
     """
@@ -73,7 +76,7 @@ class ColorFeaturesTiles:
         ap = self.analysis_params
         imgpath = ap['media_file_path']
         print('Sample + analyze: ' + imgpath +
-              ' (' + str(ap['tile_divs']) + ')')
+              ' (' + str(W) + ', ' + str(H) + ')')
 
         idnum = -1
         m = re.search(r'(\d+).[jpg|png]', path.basename(imgpath))
@@ -86,18 +89,20 @@ class ColorFeaturesTiles:
         # tilesize = ap['tile_divs']
         # tileolap = ap['tile-overlap']
 
-        tilesh = int(math.floor(imgh / 36))
-        tilesw = int(math.floor(imgw / 72))
+        tilesh = int(math.floor(imgh / H))
+        tilesw = int(math.floor(imgw / W))
 
         # convert color space once
         if ap['color_space'] == 'rgb':
             img = cv.cvtColor(img, cv.COLOR_RGB2RGB)
+        # elif ap['color_space'] == 'gray':
+        #     img = cv.cvtColor(img, cv.COLOR_RGB2Grayscale)
         else:
             img = cv.cvtColor(img, cv.COLOR_RGB2Lab)
 
         aspect = imgw / imgh
-        tilew = 72  # int(img.shape[0] / tilesize)
-        tileh = 36  # int(img.shape[1] / tilesize)
+        tilew = W  # int(img.shape[0] / tilesize)
+        tileh = H  # int(img.shape[1] / tilesize)
 
         print("Tile sizes:")
         print(tilew)

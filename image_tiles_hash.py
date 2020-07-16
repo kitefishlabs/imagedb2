@@ -16,6 +16,7 @@ class ImageTilesHash:
 
     def initialize(self, params=None):
         self._check_cf_params(params)
+        self.image_index = {}
         self.image_tile_index = {}
 
     def _check_cf_params(self, params=None):
@@ -46,6 +47,8 @@ class ImageTilesHash:
 
         cft = ColorFeaturesTiles(
             **{'media_file_path': path, 'tile_divs': bins})
+        # there are 3 color planes to work with
+        # they are analyzed separately
         data0 = cft._sample_and_analyze(0)
         data1 = cft._sample_and_analyze(1)
         data2 = cft._sample_and_analyze(2)
@@ -84,15 +87,21 @@ class ImageTilesHash:
 
         return trios
 
-    def index_directory(self):
+    def index_directory(self, guard=True):
+        """
+        index each image by color hash in L*a*b* color space.
+        """
         for filepath in glob.glob(self.params['media_directory'] + '/*.jpg'):
-            res = self.build_index_for_image(filepath, 4)
-            f = open(filepath + ".histo", "wb")
-            f.write(pickle.dumps(res))
-            f.close()
+            if (guard and path.exists(filepath + ".histo")):
+                pass
+            else:
+                res = self.build_index_for_image(filepath, 4)
+                f = open(filepath + ".histo", "wb")
+                f.write(pickle.dumps(res))
+                f.close()
 
-    def convert_8(self, val):
-        res = [(((val >> (i*3)) % 16) / 16.0) for i in range(16)]
+    def convert_8(self, val, div):
+        res = [(((val >> (i*3)) % div) / float(div)) for i in range(div)]
         res.reverse()
         return(res)
 
@@ -111,7 +120,72 @@ class ImageTilesHash:
             idnum = m.group(1)
         return int(idnum)
 
-    def index_connections(self):
+    def index_internal_connections(self):
+        """
+        """
+        all_files = glob.glob(
+            self.params['media_directory'] + '/*.jpg.histo')
+
+        # target_slots = {}
+
+        for filepatha in all_files:
+
+            rankings = {}
+            a = self.extract_file_id(filepatha)
+            b = a
+            indexa = pickle.loads(open(filepatha, "rb").read())
+            indexb = indexa[:]  # pickle.loads(open(filepathb, "rb").read())
+
+            for cell in indexa:
+
+                scores = []
+                valL = self.convert_8(cell[0], 16)
+                vala = self.convert_8(cell[1], 16)
+                valb = self.convert_8(cell[2], 16)
+
+                for cell2 in indexb:
+
+                    val2L = self.convert_8(cell2[0], 16)
+                    val2a = self.convert_8(cell2[1], 16)
+                    val2b = self.convert_8(cell2[2], 16)
+
+                    # diffs on each: L * a * b
+                    diff0 = self.diff_histograms(valL, val2L)
+                    diff1 = self.diff_histograms(vala, val2a)
+                    diff2 = self.diff_histograms(valb, val2b)
+
+                    # score is average of diffs
+                    scores += [[a, b, cell[4], cell[5], cell2[4], cell2[5],
+                                ((diff0 + diff1 + diff2) / 3.0)]]
+
+                    # try:
+                    #     existing = target_slots[(a, b)]
+                    #     target_slots[(a, b)] = (min(existing[0], cell2[4]),
+                    #                             #   max(existing[0], a[4]),
+                    #                             #   min(existing[1], x[4]),
+                    #                             max(existing[1], cell2[4]),
+                    #                             min(existing[2], cell2[5]),
+                    #                             #   max(existing[2], a[5]),
+                    #                             #   min(existing[3], a[5]),
+                    #                             max(existing[3], cell2[5]))
+                    # except KeyError:
+                    #     target_slots[(a, b)] = (
+                    #         cell2[4], cell2[4], cell2[5], cell2[5])
+                # each cell is the distances to all 256 other cells (including itself)
+                # now sort the cell's connections
+                sorted_by_dist = sorted(
+                    scores, key=(lambda score: score[-1]))[:100]
+                rankings[(b, cell[4], cell[5])] = sorted_by_dist
+
+                # print("TARG:")
+                # print(target_slots)
+
+            f = open(filepatha + ".nn1", "wb")
+            f.write(pickle.dumps(rankings))
+            f.close()
+        return target_slots
+
+    def index_connections(self, guard=True):
         """
         Internal similarities are expected to be prevalent in general, and should also correlate to positional proximity. Starting with option C.
         A/ Rank similar but distant tiles higher. (more likely to spawn images with internal consistency/repetition?)
@@ -121,66 +195,101 @@ class ImageTilesHash:
         all_files = glob.glob(
             self.params['media_directory'] + '/*.jpg.histo')
         all_files_ = glob.glob(
-            self.params['media_directory/hide'] + '/*.jpg.histo')
+            self.params['media_directory'] + '/*.jpg.histo')
 
-        target_slots = {}
+        # pickled_files = {}
+        # target_slots = {}
 
         for filepatha in all_files:
 
-            a = self.extract_file_id(filepatha)
-            indexa = pickle.loads(open(filepatha, "rb").read())
-            rankings = {}
+            if (guard and path.exists(filepatha + ".nn")):
+                pass
 
-            for filepathb in all_files_:
+            else:
+                rankings = {}
+                a = self.extract_file_id(filepatha)
 
-                # if b >= a:
-                b = self.extract_file_id(filepathb)
-                indexb = pickle.loads(open(filepathb, "rb").read())
+                # try:
+                # indexa = pickled_files[filepatha]
+                # except KeyError:
+                indexa = pickle.loads(open(filepatha, "rb").read())
+                # pickled_files[filepatha] = indexa
 
-                for cell in indexa:
+                for filepathb in all_files_:
 
-                    scores = []
-                    val = (self.convert_8(cell[0]), self.convert_8(
-                        cell[1]), self.convert_8(cell[2]))
+                    b = self.extract_file_id(filepathb)
+                    if b >= a:
 
-                    for cell2 in indexb:
+                        # try:
+                        # indexb = pickled_files[filepathb]
+                        # except KeyError:
+                        indexb = pickle.loads(open(filepathb, "rb").read())
+                        # pickled_files[filepathb] = indexb
 
-                        val2 = (self.convert_8(cell2[0]), self.convert_8(
-                            cell2[1]), self.convert_8(cell2[2]))
-                        # print((i, j, self.convert_8(cell[0]), self.convert_8(
-                        # cell[1]), self.convert_8(cell[2]), self.convert_8(cell2[0]), self.convert_8(
-                        # cell2[1]), self.convert_8(cell2[2])))
-                        diff0 = self.diff_histograms(val[0], val2[0])
-                        diff1 = self.diff_histograms(val[1], val2[1])
-                        diff2 = self.diff_histograms(val[2], val2[2])
-                        scores += [[a, b, cell[4], cell[5], cell2[4], cell2[5],
-                                    (diff0 + diff1 + diff2)]]
-                        try:
-                            existing = target_slots[(a, b)]
-                            target_slots[(a, b)] = (min(existing[0], cell2[4]),
-                                                    #   max(existing[0], a[4]),
-                                                    #   min(existing[1], x[4]),
-                                                    max(existing[1], cell2[4]),
-                                                    min(existing[2], cell2[5]),
-                                                    #   max(existing[2], a[5]),
-                                                    #   min(existing[3], a[5]),
-                                                    max(existing[3], cell2[5]))
-                        except KeyError:
-                            target_slots[(a, b)] = (
-                                cell2[4], cell2[4], cell2[5], cell2[5])
-                    # each cell is the distances to all 256 other cells (including itself)
-                    # now sort the cell's connections
-                    # print(scores)
-                    sorted_by_dist = sorted(
-                        scores, key=(lambda score: score[-1]))[:20]
-                    rankings[(b, cell[4], cell[5])] = sorted_by_dist
-            # print("TARG:")
-            # print(target_slots)
+                        for cell in indexa:
 
-            f = open(filepatha + ".nn", "wb")
-            f.write(pickle.dumps(rankings))
-            f.close()
+                            scoresa = []
+                            scoresb = []
+                            valL = self.convert_8(cell[0], 16)
+                            vala = self.convert_8(cell[1], 16)
+                            valb = self.convert_8(cell[2], 16)
+
+                            for cell2 in indexb:
+
+                                val2L = self.convert_8(cell2[0], 16)
+                                val2a = self.convert_8(cell2[1], 16)
+                                val2b = self.convert_8(cell2[2], 16)
+
+                                # diffs on each: L * a * b
+                                diff0 = self.diff_histograms(valL, val2L)
+                                diff1 = self.diff_histograms(vala, val2a)
+                                diff2 = self.diff_histograms(valb, val2b)
+
+                                score = (diff0 + diff1 + diff2) / 3.0
+                                # score is average of diffs
+                                scoresa += [[a, b, cell[4], cell[5],
+                                             cell2[4], cell2[5], score]]
+                                scoresb += [[b, a, cell2[4], cell2[5],
+                                             cell[4], cell[5], score]]
+                                # try:
+                                #     existing = target_slots[(a, b)]
+                                #     target_slots[(a, b)] = (min(existing[0], cell2[4]),
+                                #                             #   max(existing[0], a[4]),
+                                #                             #   min(existing[1], x[4]),
+                                #                             max(existing[1], cell2[4]),
+                                #                             min(existing[2], cell2[5]),
+                                #                             #   max(existing[2], a[5]),
+                                #                             #   min(existing[3], a[5]),
+                                #                             max(existing[3], cell2[5]))
+                                # except KeyError:
+                                #     target_slots[(a, b)] = (
+                                #         cell2[4], cell2[4], cell2[5], cell2[5])
+                            # each cell is the distances to all 256 other cells (including itself)
+                            # now sort the cell's connections
+                            sorted_by_dista = sorted(
+                                scoresa, key=(lambda score: score[-1]))[:100]
+                            sorted_by_distb = sorted(
+                                scoresb, key=(lambda score: score[-1]))[:100]
+                            rankings[(b, cell[4], cell[5])] = sorted_by_dista
+                            rankings[(a, cell[4], cell[5])] = sorted_by_distb
+                    # print("TARG:")
+                    # print(target_slots)
+
+                f = open(filepatha + ".nn", "wb")
+                f.write(pickle.dumps(rankings))
+                f.close()
         return target_slots
+
+    def load_connections(self, fileid):
+        filepath = self.params['media_directory'] + \
+            '/' + padint(fileid, 3) + '.jpg.histo.nn'
+        return pickle.loads(open(filepath, "rb").read())
+
+    def load_all_connections(self):
+        all_connections = {}
+        for i in range(27):
+            all_connections.update(load_connections(i))
+        return all_connections
 
     # In order to choose the files first and then within the files, we need to index each target file/point -> averaged distance combo so we can order by similarity over the entire set of points for each file. That way we shouldn't have "least bad choices" from minimizing the dist. func after a distant(dissimilar) file choice. A cursory glance at the data suggest that each individual file's points in similarity space may be clustered when mapped onto larger search space.
 
@@ -196,26 +305,31 @@ class ImageTilesHash:
             general_dist_ranking = []
 
             for key in indexa:
-                # print(key) # to-id, from-c, from-r, to-c, to-r
+                # print(key)  # to-id, from-c, from-r
                 total = 0.0
+                alen = len(indexa[key])
                 for item in indexa[key]:
                     assert(len(item) == 7)
                     total += item[-1]
+                    # print((item[-3], item[-2]))
+                if total > 0.0:
+                    total /= alen
                 assert(key[1] == item[-5])
                 assert(key[2] == item[-4])
-                # print(indexa[key])
-                # print((total, (key[0], key[1], key[2], item[-3], item[-2])))
+                # print(alen)
+                # print((total, (key[0], key[1], key[2])))
                 general_dist_ranking += [(total, (key[0],
-                                                  key[1], key[2], item[-3], item[-2]))]
+                                                  key[1], key[2]))]
 
-            dist_ordered = sorted(general_dist_ranking, key=(lambda dm: dm[0]))
+            dist_ordered = sorted(general_dist_ranking, key=(
+                lambda dm: dm[0]))
 
             dist_ = [item[0] for item in dist_ordered]
             payload_ = [item[1] for item in dist_ordered]
             dist_ /= np.max(np.abs(dist_), axis=0)
-            dlen = len(dist_)
-            dist_ = [((1. - x) + ((((1. - (i / dlen)) * 10.) ** 2.) / 100.))
-                     for i, x in enumerate(dist_)]
+            # dlen = len(dist_)
+            # dist_ = [((1. - x) + ((((1. - (i / dlen)) * 10.) ** 2.) / 100.))
+            #  for i, x in enumerate(dist_)]
             combined = list(zip(dist_, payload_))
 
             fileid = self.extract_file_id(filepatha)
@@ -232,6 +346,47 @@ class ImageTilesHash:
             f.close()
 
         return all_sorted_dists
+
+    def load_image_tile_index(self):
+        """
+        Loads all image tile histogram nn data.
+        source file id is implied/gathered from each loaded files' name/id.
+        per indexed file:
+            HISTO.NN: (target_fileid, source_row, source_col) -> (distance, (to-id, from-r, from-c, to-r, to-c))
+            expand each key -> (source_fileid, target_fileid, source_row, source_col) -> same payloads
+        store map of expanded source mappings for queries as self.image_tile_index
+        """
+        all_files = glob.glob(
+            self.params['media_directory'] + '/*.jpg.histo.nn')
+        self.image_tile_index = {}
+        for filepatha in all_files:
+            a = self.extract_file_id(filepatha)
+            expanded_indexa = {}
+            indexa = pickle.loads(open(filepatha, "rb").read())
+            for key in indexa:
+                expanded_indexa[(a, key[0], key[1], key[2])] = indexa[key]
+            self.image_tile_index.update(expanded_indexa)
+        return self.image_tile_index
+
+    def load_image_index(self, srcfileid):
+        """
+        Loads all image-index data.
+        per indexed file:
+            HISTO.NN2: (distance -> (target_field,source_row,source_col))
+        """
+        try:
+            self.image_index[srcfileid]
+        except KeyError:
+            filepatha = self.params['media_directory'] + \
+                '/' + padint(srcfileid, 3) + '.jpg.histo.nn2'
+            expanded_indexa = []
+            # indexa here is connections sorted by distance
+            indexa = pickle.loads(open(filepatha, "rb").read())
+            for item in indexa:
+                expanded_indexa += [(item[0], (srcfileid,
+                                               item[1][0], item[1][1], item[1][2]))]
+            self.image_index[srcfileid] = expanded_indexa
+        return self.image_index
 
     def plumb_range(self, id):
 
@@ -270,3 +425,31 @@ class ImageTilesHash:
 # idx = ith.index_files()
 # distrib = sorted(list(set([lst[0] for lst in idx])))
 # plt.plot(distrib)
+
+    def lookup_image_index(self, a):
+        try:
+            return self.image_index[a]
+        except KeyError:
+            print("\n\nloading image index...\n\n")
+            return self.load_image_index(a)[a]
+
+    def lookup_image_tile_index(self, a, a_ra_ca_b):
+        try:
+            return self.image_tile_index[a_ra_ca_b]
+        except KeyError:
+            print("\n\nloading image tile index...\n\n")
+            return self.load_image_tile_index()[a_ra_ca_b]
+
+    def combine_nn_indexes(self):
+        all_files = glob.glob(self.params['media_directory'] + '/*.nn')
+        nn_index = {}
+        for nnfilepath in all_files:
+            indexnn = pickle.loads(open(nnfilepath, "rb").read())
+            nn_index.update(indexnn)
+        for n in range(2):
+            f = open(self.params['media_directory'] +
+                     "/" + padint(n, 3) + ".jpg.histo.nnc", "wb")
+            combined = dict(
+                filter(lambda kelem: kelem[0] == n, nn_index.items()))
+            f.write(pickle.dumps(combined))
+            f.close()
