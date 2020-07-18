@@ -22,11 +22,8 @@ import cv2 as cv
 import numpy as np
 import matplotlib.pyplot as plt
 
-TILEH = 24
-TILEW = 36
-
 NUM_HISTO_BINS = 16
-NUM_ID_BINS = 5 # id, x, y, TILEW, TILEH
+NUM_ID_BINS = 5 # id, x, y, tilew, tileh
 
 class ColorFeaturesTiles:
     """
@@ -62,6 +59,8 @@ class ColorFeaturesTiles:
         params = {
             'verbose': False,			                       # useful for debugging
             'media_file_path': os.path.abspath('img/000.jpg'), # let's say this is the default
+            'tileh': 24,
+            'tilew': 36,
             'color_space': 'lab', 		                       # 'lab' or 'rgb'
         }                                                      # 'lab' is default!
         return params
@@ -81,17 +80,17 @@ class ColorFeaturesTiles:
         Reads and image, performs a series of samplings, feature extraction, writes each to disk
         """
         ap = self.params
+        tilew,tileh = ap['tilew'],ap['tileh']
         imgpath = ap['media_file_path']
         print('Sample + analyze: ' + imgpath +
-              ' (' + str(TILEW) + ', ' + str(TILEH) + ')')
-
+              ' (' + str(tilew) + ', ' + str(tileh) + ')')
         
         img = cv.imread(imgpath)
         
         imgw = img.shape[1]
         imgh = img.shape[0]
-        tilesh = int(math.floor(imgh / TILEH))
-        tilesw = int(math.floor(imgw / TILEW))
+        tilesh = int(math.floor(imgh / tileh))
+        tilesw = int(math.floor(imgw / tilew))
         aspect = imgw / imgh
 
         # convert color space once
@@ -118,13 +117,13 @@ class ColorFeaturesTiles:
                 # if x and y have advanced and as they continue to advance,
                 # lastx and lasty will trail and zero out mask rectangles
                 if ((lastx,lasty) != (x,y)):
-                    mask[(TILEW * lastx):(TILEW * (lastx + 1)),
-                     (TILEH * lasty):(TILEH * (lasty + 1))] = 0
+                    mask[(tilew * lastx):(tilew * (lastx + 1)),
+                     (tileh * lasty):(tileh * (lasty + 1))] = 0
                 lastx = x
                 lasty = y
                 # open the mask rect area only
-                mask[(TILEW * x):(TILEW * (x + 1)),
-                     (TILEH * y):(TILEH * (y + 1))] = 255
+                mask[(tilew * x):(tilew * (x + 1)),
+                     (tileh * y):(tileh * (y + 1))] = 255
                 
                 hist_masked = cv.calcHist(
                     [img], 
@@ -146,7 +145,7 @@ class ColorFeaturesTiles:
                 # a row in the output is a single color channel's histogram
                 # over a tile within the image (16 bins, 256 range, bin size 16)
                 id_info = np.array(
-                    [ap['imgid'], x, y, TILEW, TILEH], dtype='float32')
+                    [ap['imgid'], x, y, tilew, tileh], dtype='float32')
                 id_info.shape = (NUM_ID_BINS, 1)
                 row = np.r_[hist_masked, id_info]
                 all_histograms = np.r_[all_histograms, row]
