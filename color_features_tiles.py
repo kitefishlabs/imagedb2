@@ -52,7 +52,7 @@ class ColorFeaturesTiles:
         """
         self.params['imgid'] = self._extract_integer_from_img_filename(self.params['media_file_path'])
         if self.params['color_space'] != 'rgb':
-                    self.params['color_space'] = 'lab'
+            self.params['color_space'] = 'lab'
 
     @staticmethod
     def default_cf_params():
